@@ -50,6 +50,16 @@ Sandbox (Docker/Unikraft)
 - **Constructors:** Use `func NewFoo() *Foo` pattern
 - **No manual versions:** semver is automated by semantic-release from commit history
 
+## Git Workflow
+
+- **Never commit directly to `main`.** All changes go through feature branches and pull requests.
+- **Branch naming:** `feat/short-description`, `fix/short-description`, `docs/short-description`, `chore/short-description`. Match the conventional commit type.
+- **One logical change per branch.** Don't bundle unrelated work.
+- **PR title** must be a valid conventional commit message (it becomes the squash commit message).
+- **CI must pass** before merging. The CI workflow runs on PRs automatically.
+- **Merge via squash merge** to keep `main` history clean. GitHub is configured for this.
+- **After merge**, delete the feature branch.
+
 ## Package Layout
 
 - `pkg/proxy/` - HTTP reverse proxy core, streaming, provider-specific auth injection
