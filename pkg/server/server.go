@@ -63,7 +63,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // registerRequest is the JSON body for POST /v1/sessions.
@@ -104,7 +104,7 @@ func (s *Server) handleRegisterSession(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "registered"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "registered"})
 }
 
 func (s *Server) handleRevokeSession(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +122,7 @@ func (s *Server) handleRevokeSession(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("revoked session token=%s", token)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "revoked"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "revoked"})
 }
 
 // sessionInfo is the JSON representation of a session in list responses.
@@ -148,5 +148,5 @@ func (s *Server) handleListSessions(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(infos)
+	json.NewEncoder(w).Encode(infos)
 }
