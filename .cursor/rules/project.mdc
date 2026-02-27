@@ -1,0 +1,69 @@
+---
+alwaysApply: true
+---
+# llm-proxy
+
+Credential-injecting LLM reverse proxy. Stateless. Validates session tokens,
+swaps in real API keys, streams responses.
+
+## Architecture
+
+```
+Sandbox (Docker/Unikraft)
+  │
+  │  HTTP: POST /v1/messages (Bearer: session-<token>)
+  │
+  ▼
+┌──────────────────────────────────────────────────┐
+│  llm-proxy                                       │
+│                                                  │
+│  Server (net/http)                               │
+│  ├─ POST /v1/sessions     (register session)     │
+│  ├─ DELETE /v1/sessions/{token}  (revoke)        │
+│  ├─ GET /v1/sessions      (list)                 │
+│  ├─ GET /v1/health        (health check)         │
+│  └─ /* (proxy handler)                           │
+│     ├─ Extract session token from auth header    │
+│     ├─ Lookup session -> {provider, api_key}     │
+│     ├─ Inject provider-specific auth headers     │
+│     └─ Forward request, stream response          │
+│                                                  │
+│  MemoryStore (session registry)                  │
+│  └─ map[token]*Session (thread-safe)             │
+└──────────────────────────────────────────────────┘
+  │
+  │  HTTPS: real API key injected
+  │
+  ▼
+  LLM Provider (Anthropic, OpenAI, Ollama)
+```
+
+## Conventions
+
+- **Language:** Go 1.25+
+- **Commits:** Conventional Commits (feat/fix/refactor/docs/test/ci/chore).
+  Prefix every commit message. Breaking changes go in the commit footer.
+- **Testing:** Standard Go testing with table-driven tests
+- **Build:** Use `make` for all operations. Run `make help` for targets.
+- **Formatting:** `make fmt` runs goimports + golangci-lint
+- **Errors:** Wrap with `fmt.Errorf("context: %w", err)`
+- **Constructors:** Use `func NewFoo() *Foo` pattern
+- **No manual versions:** semver is automated by semantic-release from commit history
+
+## Package Layout
+
+- `pkg/proxy/` - HTTP reverse proxy core, streaming, provider-specific auth injection
+- `pkg/session/` - Session token store interface and in-memory implementation
+- `pkg/server/` - HTTP server setup, routes, registry API, health endpoint
+
+## Key Design Decisions
+
+1. **Stateless proxy.** No conversation state, no storage. Pure request forwarding
+   with credential injection.
+2. **Provider detection.** Session records which provider to use. Auth header
+   format is provider-specific (Anthropic: `x-api-key`, OpenAI: `Authorization: Bearer`).
+3. **Streaming pass-through.** SSE and NDJSON responses are flushed immediately
+   to the client. No buffering, no parsing.
+4. **Session registry API.** The control plane registers/revokes sessions via
+   HTTP endpoints. Sessions are held in memory (lost on restart, re-registered
+   by control plane on reconnect).
