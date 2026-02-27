@@ -1,0 +1,15 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+issues:
+  exclude-rules:
+    # defer Close() — error is unrecoverable at cleanup time.
+    - linters: [errcheck]
+      source: "defer .+\\.Close\\("
+    # Writing to http.ResponseWriter — nothing useful to do with the error.
+    - linters: [errcheck]
+      source: "json\\.NewEncoder\\(.+\\)\\.Encode\\("
+    - linters: [errcheck]
+      source: "io\\.Copy\\("
+    - linters: [errcheck]
+      source: "fmt\\.Fprint"

@@ -100,7 +100,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if isStreamingResponse(resp) {
 		StreamResponse(w, resp.Body)
 	} else {
-		_, _ = io.Copy(w, resp.Body)
+		io.Copy(w, resp.Body)
 	}
 }
 
