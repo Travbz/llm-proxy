@@ -106,17 +106,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // extractToken extracts the session token from the request's auth headers.
 // Supports both OpenAI-style (Authorization: Bearer) and Anthropic-style
-// (x-api-key) headers. Strips the "session-" prefix if present.
+// (x-api-key) headers. The token is returned as-is (including the "session-"
+// prefix) since the session store keys include the prefix.
 func extractToken(r *http.Request) string {
 	// Check Authorization header (OpenAI style).
 	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		token := strings.TrimPrefix(auth, "Bearer ")
-		return strings.TrimPrefix(token, "session-")
+		return strings.TrimPrefix(auth, "Bearer ")
 	}
 
 	// Check x-api-key header (Anthropic style).
 	if apiKey := r.Header.Get("x-api-key"); apiKey != "" {
-		return strings.TrimPrefix(apiKey, "session-")
+		return apiKey
 	}
 
 	return ""
