@@ -16,14 +16,16 @@ import (
 // Proxy is the credential-injecting LLM reverse proxy.
 type Proxy struct {
 	store      session.Store
+	usage      *session.UsageTracker
 	httpClient *http.Client
 	logger     *log.Logger
 }
 
 // New creates a new Proxy with the given session store and logger.
-func New(store session.Store, logger *log.Logger) *Proxy {
+func New(store session.Store, usage *session.UsageTracker, logger *log.Logger) *Proxy {
 	return &Proxy{
 		store: store,
+		usage: usage,
 		httpClient: &http.Client{
 			// LLM requests can be slow, especially with thinking blocks.
 			Timeout: 5 * time.Minute,
@@ -96,11 +98,26 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
 
+	// Wrap body in a metering reader to capture response for usage extraction.
+	mr := newMeteringReader(resp.Body)
+
 	// Stream or copy response body.
 	if isStreamingResponse(resp) {
-		StreamResponse(w, resp.Body)
+		StreamResponse(w, mr)
+		// Extract usage from the captured SSE data.
+		input, output := extractUsageFromSSE(mr.Bytes(), sess.Provider)
+		if input > 0 || output > 0 {
+			p.usage.Record(token, input, output)
+			p.logger.Printf("usage: session=%s input=%d output=%d", sess.SandboxID, input, output)
+		}
 	} else {
-		io.Copy(w, resp.Body)
+		_, _ = io.Copy(w, mr)
+		// Extract usage from the captured JSON body.
+		input, output := extractUsage(mr.Bytes(), sess.Provider)
+		if input > 0 || output > 0 {
+			p.usage.Record(token, input, output)
+			p.logger.Printf("usage: session=%s input=%d output=%d", sess.SandboxID, input, output)
+		}
 	}
 }
 

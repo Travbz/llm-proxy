@@ -89,3 +89,29 @@ If the client (sandbox) disconnects mid-stream:
 - `w.Write` returns an error
 - `StreamResponse` returns immediately
 - The upstream connection is closed by `resp.Body.Close()`
+
+## Metering during streaming
+
+Streaming responses pass through a `meteringReader` that captures a copy of all bytes as they flow to the agent. After the stream completes, `extractUsageFromSSE` scans backward through the captured data for the final event containing a `usage` block.
+
+```mermaid
+sequenceDiagram
+    participant LLM as LLM Provider
+    participant MR as meteringReader
+    participant Agent as Sandbox Agent
+    participant Tracker as UsageTracker
+
+    loop Until EOF
+        LLM->>MR: Read(buf)
+        MR->>MR: Capture to internal buffer
+        MR->>Agent: Write(buf) + Flush()
+    end
+
+    LLM->>MR: EOF
+    MR->>MR: extractUsageFromSSE(buffer)
+    MR->>Tracker: Record(token, input, output)
+```
+
+The metering reader does not buffer or delay the stream -- the agent receives tokens at the same speed as if the reader wasn't there. The buffer capture is a side-copy. This means usage extraction is best-effort: if the stream is interrupted before the final usage event arrives, token counts for that request will be zero.
+
+For Anthropic, the usage comes in the `message_delta` event near the end of the stream. For OpenAI, it's in the final chunk before the `[DONE]` sentinel. The extractor scans backward from the end of the buffer to find the last `data:` line containing a parseable `usage` object.
