@@ -16,6 +16,7 @@ import (
 // Server is the HTTP server for the LLM proxy.
 type Server struct {
 	store  session.Store
+	usage  *session.UsageTracker
 	proxy  *proxy.Proxy
 	mux    *http.ServeMux
 	logger *log.Logger
@@ -23,9 +24,12 @@ type Server struct {
 
 // New creates a new Server with the given session store.
 func New(store session.Store, logger *log.Logger) *Server {
+	usage := session.NewUsageTracker()
+
 	s := &Server{
 		store:  store,
-		proxy:  proxy.New(store, logger),
+		usage:  usage,
+		proxy:  proxy.New(store, usage, logger),
 		mux:    http.NewServeMux(),
 		logger: logger,
 	}
@@ -34,6 +38,9 @@ func New(store session.Store, logger *log.Logger) *Server {
 	s.mux.HandleFunc("POST /v1/sessions", s.handleRegisterSession)
 	s.mux.HandleFunc("DELETE /v1/sessions/{token}", s.handleRevokeSession)
 	s.mux.HandleFunc("GET /v1/sessions", s.handleListSessions)
+
+	// Usage endpoint.
+	s.mux.HandleFunc("GET /v1/sessions/{token}/usage", s.handleGetUsage)
 
 	// Health endpoint.
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
@@ -114,6 +121,9 @@ func (s *Server) handleRevokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Clear usage data for this session.
+	s.usage.Clear(token)
+
 	if err := s.store.Revoke(token); err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"revoke failed: %s"}`, err), http.StatusInternalServerError)
 		return
@@ -149,4 +159,17 @@ func (s *Server) handleListSessions(w http.ResponseWriter, _ *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(infos)
+}
+
+func (s *Server) handleGetUsage(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if token == "" {
+		http.Error(w, `{"error":"token is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	usage := s.usage.Get(token)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(usage)
 }

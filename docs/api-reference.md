@@ -120,6 +120,38 @@ curl http://localhost:8090/v1/sessions
 
 ---
 
+### GET /v1/sessions/{token}/usage
+
+Get accumulated token usage for a session. Called by the api-gateway for billing, or by the control plane for monitoring.
+
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `token` | The session token to query usage for. |
+
+**Response (200 OK):**
+
+```json
+{
+  "input_tokens": 1520,
+  "output_tokens": 3840,
+  "requests": 7
+}
+```
+
+All fields are cumulative since session registration. If the token has no recorded usage (e.g. no LLM calls made yet), all values are `0`.
+
+Usage data is cleared when the session is revoked via `DELETE /v1/sessions/{token}`.
+
+**curl example:**
+
+```bash
+curl http://localhost:8090/v1/sessions/session-my-token/usage
+```
+
+---
+
 ### GET /v1/health
 
 Health check endpoint.
@@ -144,10 +176,10 @@ The proxy extracts the session token from one of two headers:
 
 | Header | Format | Used by |
 |---|---|---|
-| `Authorization` | `Bearer session-<token>` or `Bearer <token>` | OpenAI SDK |
-| `x-api-key` | `session-<token>` or `<token>` | Anthropic SDK |
+| `Authorization` | `Bearer session-<token>` | OpenAI SDK |
+| `x-api-key` | `session-<token>` | Anthropic SDK |
 
-The `session-` prefix is optional and stripped during extraction. Both headers are checked -- `Authorization` first, then `x-api-key`.
+The token is used as-is (including the `session-` prefix) for session lookup -- the control plane registers sessions with the full prefixed token. Both headers are checked -- `Authorization` first, then `x-api-key`.
 
 ### Request flow
 
