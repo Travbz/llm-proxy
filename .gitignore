@@ -1,5 +1,6 @@
 # Binary
 llm-proxy
+build/
 
 # Go
 *.exe
