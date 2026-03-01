@@ -12,6 +12,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,6 +24,7 @@ jobs:
           go-version-file: go.mod
       - run: make build
       - uses: cycjimmy/semantic-release-action@v4
+        id: semantic
         with:
           extra_plugins: |
             @semantic-release/commit-analyzer
@@ -28,3 +32,52 @@ jobs:
             @semantic-release/github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  binaries:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go mod download
+      - name: Build release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.release.outputs.new_release_version }}"
+          os="${{ matrix.goos }}"
+          arch="${{ matrix.goarch }}"
+          outdir="dist"
+          mkdir -p "$outdir"
+          bin="ghostproxy"
+          target="${outdir}/${bin}_${version}_${os}_${arch}"
+          GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -o "$target" .
+          tarball="${target}.tar.gz"
+          tar -czf "$tarball" -C "$outdir" "$(basename "$target")"
+          sha256sum "$tarball" > "${tarball}.sha256"
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${{ needs.release.outputs.new_release_version }}"
+          for f in dist/*.tar.gz dist/*.tar.gz.sha256; do
+            gh release upload "$tag" "$f" --clobber
+          done
