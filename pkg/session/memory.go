@@ -50,6 +50,22 @@ func (m *MemoryStore) Revoke(token string) error {
 	return nil
 }
 
+// RevokeBySandboxID removes all sessions for the given sandbox and
+// returns the number of revoked sessions.
+func (m *MemoryStore) RevokeBySandboxID(sandboxID string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	revoked := 0
+	for token, sess := range m.sessions {
+		if sess.SandboxID == sandboxID {
+			delete(m.sessions, token)
+			revoked++
+		}
+	}
+	return revoked
+}
+
 // List returns all registered sessions.
 func (m *MemoryStore) List() []*Session {
 	m.mu.RLock()

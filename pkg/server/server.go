@@ -3,11 +3,13 @@
 package server
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"llm-proxy/pkg/proxy"
 	"llm-proxy/pkg/session"
@@ -15,25 +17,28 @@ import (
 
 // Server is the HTTP server for the LLM proxy.
 type Server struct {
-	store  session.Store
-	proxy  *proxy.Proxy
-	mux    *http.ServeMux
-	logger *log.Logger
+	store      session.Store
+	proxy      *proxy.Proxy
+	mux        *http.ServeMux
+	logger     *log.Logger
+	adminToken string
 }
 
-// New creates a new Server with the given session store.
-func New(store session.Store, logger *log.Logger) *Server {
+// New creates a new Server with the given session store and admin token.
+func New(store session.Store, logger *log.Logger, adminToken string) *Server {
 	s := &Server{
-		store:  store,
-		proxy:  proxy.New(store, logger),
-		mux:    http.NewServeMux(),
-		logger: logger,
+		store:      store,
+		proxy:      proxy.New(store, logger),
+		mux:        http.NewServeMux(),
+		logger:     logger,
+		adminToken: adminToken,
 	}
 
 	// Session registry API (called by the control plane).
-	s.mux.HandleFunc("POST /v1/sessions", s.handleRegisterSession)
-	s.mux.HandleFunc("DELETE /v1/sessions/{token}", s.handleRevokeSession)
-	s.mux.HandleFunc("GET /v1/sessions", s.handleListSessions)
+	s.mux.HandleFunc("POST /v1/sessions", s.requireAdminAuth(s.handleRegisterSession))
+	s.mux.HandleFunc("DELETE /v1/sessions/{token}", s.requireAdminAuth(s.handleRevokeSession))
+	s.mux.HandleFunc("DELETE /v1/sandboxes/{id}/sessions", s.requireAdminAuth(s.handleRevokeSandboxSessions))
+	s.mux.HandleFunc("GET /v1/sessions", s.requireAdminAuth(s.handleListSessions))
 
 	// Health endpoint.
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
@@ -64,6 +69,26 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) requireAdminAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.adminToken == "" {
+			http.Error(w, `{"error":"admin api disabled"}`, http.StatusServiceUnavailable)
+			return
+		}
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(token), []byte(s.adminToken)) != 1 {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
 }
 
 // registerRequest is the JSON body for POST /v1/sessions.
@@ -119,16 +144,31 @@ func (s *Server) handleRevokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Printf("revoked session token=%s", token)
+	s.logger.Printf("revoked session")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "revoked"})
 }
 
+func (s *Server) handleRevokeSandboxSessions(w http.ResponseWriter, r *http.Request) {
+	sandboxID := r.PathValue("id")
+	if sandboxID == "" {
+		http.Error(w, `{"error":"sandbox id is required"}`, http.StatusBadRequest)
+		return
+	}
+	revoked := s.store.RevokeBySandboxID(sandboxID)
+	s.logger.Printf("revoked %d sessions for sandbox=%s", revoked, sandboxID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":  "revoked",
+		"count":   revoked,
+		"sandbox": sandboxID,
+	})
+}
+
 // sessionInfo is the JSON representation of a session in list responses.
-// The APIKey is intentionally omitted.
 type sessionInfo struct {
-	Token       string `json:"token"`
 	Provider    string `json:"provider"`
 	SandboxID   string `json:"sandbox_id"`
 	UpstreamURL string `json:"upstream_url,omitempty"`
@@ -140,7 +180,6 @@ func (s *Server) handleListSessions(w http.ResponseWriter, _ *http.Request) {
 	infos := make([]sessionInfo, len(sessions))
 	for i, sess := range sessions {
 		infos[i] = sessionInfo{
-			Token:       sess.Token,
 			Provider:    sess.Provider,
 			SandboxID:   sess.SandboxID,
 			UpstreamURL: sess.UpstreamURL,

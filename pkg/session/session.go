@@ -33,6 +33,10 @@ type Store interface {
 	// Revoke removes a session from the store.
 	Revoke(token string) error
 
+	// RevokeBySandboxID removes all sessions associated with a sandbox and
+	// returns the number of revoked sessions.
+	RevokeBySandboxID(sandboxID string) int
+
 	// List returns all registered sessions.
 	List() []*Session
 }

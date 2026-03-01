@@ -90,6 +90,7 @@ case "myprovider":
 
 ```bash
 curl -X POST http://localhost:8090/v1/sessions \
+  -H "Authorization: Bearer $GHOSTPROXY_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"token":"t1","provider":"myprovider","api_key":"real-key"}'
 ```
