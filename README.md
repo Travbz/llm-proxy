@@ -1,4 +1,4 @@
-# llm-proxy
+# GhostProxy
 
 A credential-injecting reverse proxy for LLM API calls. Sits between sandboxed agents and upstream providers (Anthropic, OpenAI, Ollama), swapping session tokens for real API keys on every request. The sandbox never sees the real credentials.
 
@@ -6,9 +6,9 @@ Built as part of a three-service agent sandbox system:
 
 | Repo | What it does |
 |---|---|
-| **[control-plane](https://github.com/Travbz/control-plane)** | Orchestrator -- config, secrets, provisioning, boot sequence |
-| **[llm-proxy](https://github.com/Travbz/llm-proxy)** | This repo -- credential-injecting LLM reverse proxy |
-| **[sandbox-image](https://github.com/Travbz/sandbox-image)** | Container image -- entrypoint, env stripping, privilege drop |
+| **[CommandGrid](https://github.com/Travbz/CommandGrid)** | Orchestrator -- config, secrets, provisioning, boot sequence |
+| **[GhostProxy](https://github.com/Travbz/GhostProxy)** | This repo -- credential-injecting LLM reverse proxy |
+| **[RootFS](https://github.com/Travbz/RootFS)** | Container image -- entrypoint, env stripping, privilege drop |
 
 ---
 
@@ -16,8 +16,8 @@ Built as part of a three-service agent sandbox system:
 
 ```mermaid
 sequenceDiagram
-    participant CP as control-plane
-    participant Proxy as llm-proxy
+    participant CP as CommandGrid
+    participant Proxy as GhostProxy
     participant Sandbox as sandbox (agent)
     participant LLM as LLM Provider
 
@@ -52,7 +52,7 @@ Each provider has its own auth header format. The proxy handles the translation:
 
 ## API
 
-### Session registry (called by control-plane)
+### Session registry (called by CommandGrid)
 
 | Method | Path | Description |
 |---|---|---|
@@ -72,7 +72,7 @@ Everything not matching the above routes goes through the proxy handler. The pro
 Requires Go 1.25+. If you use Nix, `nix develop` gets you a shell with everything you need.
 
 ```bash
-make build    # builds to ./build/llm-proxy
+make build    # builds to ./build/ghostproxy
 make test     # runs all tests
 make lint     # golangci-lint
 make run      # builds and runs on :8090
@@ -82,7 +82,7 @@ make run      # builds and runs on :8090
 
 ```bash
 # start the proxy
-./build/llm-proxy -addr :8090
+./build/ghostproxy -addr :8090
 
 # register a session
 curl -X POST http://localhost:8090/v1/sessions \
@@ -101,7 +101,7 @@ curl -X POST http://localhost:8090/v1/messages \
 ## Project structure
 
 ```
-llm-proxy/
+GhostProxy/
 ├── main.go                         # entry point, flag parsing
 ├── pkg/
 │   ├── proxy/

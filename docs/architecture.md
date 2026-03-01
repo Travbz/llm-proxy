@@ -1,6 +1,6 @@
 # Architecture
 
-The llm-proxy is a stateless HTTP reverse proxy that sits between sandboxed agents and LLM providers. Its only job is credential injection -- it validates a session token on every request, swaps it for the real API key, and forwards the request upstream. It never stores conversations, never parses request bodies, and never modifies responses.
+GhostProxy is a stateless HTTP reverse proxy that sits between sandboxed agents and LLM providers. Its only job is credential injection -- it validates a session token on every request, swaps it for the real API key, and forwards the request upstream. It never stores conversations, never parses request bodies, and never modifies responses.
 
 ## Where it sits
 
@@ -11,8 +11,8 @@ flowchart LR
     end
 
     subgraph host [Host Machine]
-        Proxy[llm-proxy :8090]
-        CP[control-plane]
+        Proxy[GhostProxy :8090]
+        CP[CommandGrid]
     end
 
     subgraph upstream [Internet]
@@ -37,7 +37,7 @@ Every request that hits the proxy (except the registry API endpoints) goes throu
 ```mermaid
 sequenceDiagram
     participant Agent as Agent in Sandbox
-    participant Proxy as llm-proxy
+    participant Proxy as GhostProxy
     participant Store as MemoryStore
     participant LLM as LLM Provider
 

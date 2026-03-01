@@ -39,21 +39,21 @@ For Ollama, both auth headers are removed and nothing is set -- Ollama doesn't n
 - Auth header: `x-api-key`
 - The Anthropic SDK also sends `anthropic-version` -- this passes through untouched.
 - Streaming uses SSE (`text/event-stream`).
-- The control plane sets `ANTHROPIC_BASE_URL` inside the sandbox so the SDK routes through the proxy.
+- CommandGrid sets `ANTHROPIC_BASE_URL` inside the sandbox so the SDK routes through the proxy.
 
 ### OpenAI
 
 - Auth header: `Authorization: Bearer <key>`
 - Compatible with any OpenAI-compatible API (Azure OpenAI, Together, Groq, etc.) by setting a custom `upstream_url` in the session.
 - Streaming uses SSE (`text/event-stream`).
-- The control plane sets `OPENAI_BASE_URL` inside the sandbox.
+- CommandGrid sets `OPENAI_BASE_URL` inside the sandbox.
 
 ### Ollama
 
 - No auth required. The proxy still strips auth headers for consistency.
 - Streaming uses NDJSON (`application/x-ndjson`).
 - Default upstream is `http://localhost:11434` -- assumes Ollama is running on the host.
-- The control plane sets `OLLAMA_HOST` inside the sandbox.
+- CommandGrid sets `OLLAMA_HOST` inside the sandbox.
 
 ## Adding a new provider
 
@@ -79,7 +79,7 @@ case ProviderMyProvider:
     return "https://api.myprovider.com"
 ```
 
-4. **Add base URL injection** in the orchestrator (`control-plane/pkg/orchestrator/orchestrator.go`):
+4. **Add base URL injection** in the orchestrator (`CommandGrid/pkg/orchestrator/orchestrator.go`):
 
 ```go
 case "myprovider":
