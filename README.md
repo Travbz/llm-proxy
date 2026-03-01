@@ -21,7 +21,7 @@ sequenceDiagram
     participant Sandbox as sandbox (agent)
     participant LLM as LLM Provider
 
-    CP->>Proxy: POST /v1/sessions {token, provider, api_key}
+    CP->>Proxy: POST /v1/sessions {token, provider, api_key}<br/>Authorization: Bearer admin-token
     Note over Proxy: Session registered in memory
 
     Sandbox->>Proxy: POST /v1/messages<br/>x-api-key: session-abc123
@@ -30,7 +30,7 @@ sequenceDiagram
     LLM-->>Proxy: SSE stream
     Proxy-->>Sandbox: SSE stream (pass-through)
 
-    CP->>Proxy: DELETE /v1/sessions/abc123
+    CP->>Proxy: DELETE /v1/sessions/abc123<br/>Authorization: Bearer admin-token
     Note over Proxy: Session revoked
 ```
 
@@ -57,9 +57,12 @@ Each provider has its own auth header format. The proxy handles the translation:
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/v1/sessions` | Register a session: `{token, provider, api_key, sandbox_id}` |
-| `DELETE` | `/v1/sessions/{token}` | Revoke a session |
-| `GET` | `/v1/sessions` | List active sessions (keys omitted) |
+| `DELETE` | `/v1/sessions/{token}` | Revoke a single session |
+| `DELETE` | `/v1/sandboxes/{id}/sessions` | Revoke all sessions for a sandbox |
+| `GET` | `/v1/sessions` | List active sessions (tokens and keys omitted) |
 | `GET` | `/v1/health` | Health check |
+
+Set `GHOSTPROXY_ADMIN_TOKEN` (or pass `-admin-token`) to enable registry endpoints. Requests to `/v1/sessions*` require `Authorization: Bearer <admin-token>`.
 
 ### Proxy (called by sandboxes)
 
@@ -86,6 +89,7 @@ make run      # builds and runs on :8090
 
 # register a session
 curl -X POST http://localhost:8090/v1/sessions \
+  -H "Authorization: Bearer $GHOSTPROXY_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"token":"my-token","provider":"anthropic","api_key":"sk-ant-...","sandbox_id":"dev"}'
 

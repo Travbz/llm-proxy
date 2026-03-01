@@ -14,6 +14,7 @@ Default listen address: `:8090` (override with `-addr`).
 ### POST /v1/sessions
 
 Register a new session. Called by the control plane when a sandbox boots.
+Requires `Authorization: Bearer <admin-token>`.
 
 **Request:**
 
@@ -54,6 +55,7 @@ Register a new session. Called by the control plane when a sandbox boots.
 
 ```bash
 curl -X POST http://localhost:8090/v1/sessions \
+  -H "Authorization: Bearer $GHOSTPROXY_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "token": "my-session-token",
@@ -68,6 +70,7 @@ curl -X POST http://localhost:8090/v1/sessions \
 ### DELETE /v1/sessions/{token}
 
 Revoke a session. Called by the control plane when a sandbox shuts down.
+Requires `Authorization: Bearer <admin-token>`.
 
 **Path parameters:**
 
@@ -88,21 +91,39 @@ Revoking a non-existent token is not an error -- it returns 200 regardless.
 **curl example:**
 
 ```bash
-curl -X DELETE http://localhost:8090/v1/sessions/my-session-token
+curl -X DELETE http://localhost:8090/v1/sessions/my-session-token \
+  -H "Authorization: Bearer $GHOSTPROXY_ADMIN_TOKEN"
+```
+
+---
+
+### DELETE /v1/sandboxes/{id}/sessions
+
+Revoke all sessions associated with a sandbox ID.
+Requires `Authorization: Bearer <admin-token>`.
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "revoked",
+  "count": 2,
+  "sandbox": "my-sandbox"
+}
 ```
 
 ---
 
 ### GET /v1/sessions
 
-List all active sessions. API keys are omitted from the response.
+List all active sessions. Tokens and API keys are omitted from the response.
+Requires `Authorization: Bearer <admin-token>`.
 
 **Response (200 OK):**
 
 ```json
 [
   {
-    "token": "my-session-token",
     "provider": "anthropic",
     "sandbox_id": "dev-sandbox",
     "upstream_url": ""
@@ -115,7 +136,8 @@ Returns an empty array `[]` if no sessions are registered.
 **curl example:**
 
 ```bash
-curl http://localhost:8090/v1/sessions
+curl http://localhost:8090/v1/sessions \
+  -H "Authorization: Bearer $GHOSTPROXY_ADMIN_TOKEN"
 ```
 
 ---

@@ -85,9 +85,9 @@ This means the proxy can restart without losing anything meaningful. The control
 
 Sessions are ephemeral and scoped to a single sandbox run:
 
-1. **Control plane boots a sandbox** -- generates a random session token, registers it with the proxy via `POST /v1/sessions`.
+1. **Control plane boots a sandbox** -- generates a random session token, registers it with the proxy via `POST /v1/sessions` (admin-authenticated).
 2. **Sandbox runs** -- the agent makes LLM calls using the session token as its "API key". The proxy validates and swaps on every request.
-3. **Control plane tears down the sandbox** -- revokes the session via `DELETE /v1/sessions/{token}`. Any subsequent requests with that token get a 401.
+3. **Control plane tears down the sandbox** -- revokes sessions via `DELETE /v1/sandboxes/{id}/sessions` (admin-authenticated). Any subsequent requests with those tokens get a 401.
 
 If the proxy restarts, all sessions are lost (they're in-memory). The control plane is responsible for re-registering sessions for any running sandboxes.
 

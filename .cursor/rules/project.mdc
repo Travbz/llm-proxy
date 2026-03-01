@@ -19,8 +19,9 @@ Sandbox (Docker/Unikraft)
 │                                                  │
 │  Server (net/http)                               │
 │  ├─ POST /v1/sessions     (register session)     │
-│  ├─ DELETE /v1/sessions/{token}  (revoke)        │
-│  ├─ GET /v1/sessions      (list)                 │
+│  ├─ DELETE /v1/sessions/{token}  (revoke one)    │
+│  ├─ DELETE /v1/sandboxes/{id}/sessions (revoke)  │
+│  ├─ GET /v1/sessions      (list metadata)        │
 │  ├─ GET /v1/health        (health check)         │
 │  └─ /* (proxy handler)                           │
 │     ├─ Extract session token from auth header    │
