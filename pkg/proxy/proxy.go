@@ -47,7 +47,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Look up session.
-	sess, err := p.store.Lookup(token)
+	sess, err := p.lookupSession(token)
 	if err != nil {
 		http.Error(w, `{"error":"invalid session token"}`, http.StatusUnauthorized)
 		return
@@ -106,20 +106,40 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // extractToken extracts the session token from the request's auth headers.
 // Supports both OpenAI-style (Authorization: Bearer) and Anthropic-style
-// (x-api-key) headers. Strips the "session-" prefix if present.
+// (x-api-key) headers.
 func extractToken(r *http.Request) string {
 	// Check Authorization header (OpenAI style).
 	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		token := strings.TrimPrefix(auth, "Bearer ")
-		return strings.TrimPrefix(token, "session-")
+		return strings.TrimPrefix(auth, "Bearer ")
 	}
 
 	// Check x-api-key header (Anthropic style).
 	if apiKey := r.Header.Get("x-api-key"); apiKey != "" {
-		return strings.TrimPrefix(apiKey, "session-")
+		return apiKey
 	}
 
 	return ""
+}
+
+// lookupSession performs token lookup with compatibility for either token
+// format ("session-<hex>" and "<hex>").
+func (p *Proxy) lookupSession(token string) (*session.Session, error) {
+	sess, err := p.store.Lookup(token)
+	if err == nil {
+		return sess, nil
+	}
+
+	var alternate string
+	if strings.HasPrefix(token, "session-") {
+		alternate = strings.TrimPrefix(token, "session-")
+	} else {
+		alternate = "session-" + token
+	}
+
+	if alternate == token || alternate == "" {
+		return nil, err
+	}
+	return p.store.Lookup(alternate)
 }
 
 // copyHeaders copies HTTP headers, excluding hop-by-hop headers that
